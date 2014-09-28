@@ -1,0 +1,5 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <StartArguments>-samples "H:\Stat\Tokenization\Regnum.txt" -source_format 0 -dict e:\mvoice\lem\bin-windows\dictionary.xml -result lemma -save words.txt -append -start_index 0 -nsample 100 -rx_stop "E:\projects\Word2Vector\Text2Lemmas\rx_stop.txt"</StartArguments>
+  </PropertyGroup>
+</Project>
