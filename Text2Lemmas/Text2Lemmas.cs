@@ -13,6 +13,8 @@ abstract class Samples
  public abstract void Start();
  public abstract string Next();
  public abstract void SetTokenDelimiter( char c );
+ public abstract void SetMinSentenceLen( int len );
+ public abstract void SetMaxSentenceLen( int len );
 }
 
 
@@ -61,6 +63,17 @@ class Samples1 : Samples
  {
   throw new NotImplementedException();
  }
+
+ public override void SetMinSentenceLen( int len )
+ {
+  throw new NotImplementedException();
+ }
+
+ public override void SetMaxSentenceLen( int len )
+ {
+  throw new NotImplementedException();
+ }
+
 }
 
 
@@ -70,6 +83,7 @@ class Samples2 : Samples
  string source_filepath;
  string[] filenames;
  char token_delimiter = ' ';
+ int min_sent_len = 0, max_sent_len = int.MaxValue;
 
  public Samples2( string _source_filepath )
  {
@@ -80,6 +94,17 @@ class Samples2 : Samples
   else
    filenames = System.IO.Directory.GetFiles( source_filepath );
  }
+
+ public override void SetMinSentenceLen( int len )
+ {
+  min_sent_len = len;
+ }
+
+ public override void SetMaxSentenceLen( int len )
+ {
+  max_sent_len = len;
+ }
+
 
  public override int TotalCount()
  {
@@ -128,6 +153,7 @@ class Samples2 : Samples
 
   b.Length = 0;
 
+  int token_count = 0;
   while( true )
   {
    string word = rdr.ReadLine();
@@ -142,8 +168,14 @@ class Samples2 : Samples
     break;
    }
    else
+   {
     b.AppendFormat( "{1}{0}", word, token_delimiter );
+    token_count++;
+   }
   }
+
+  if( token_count < min_sent_len || token_count > max_sent_len )
+   b.Length = 0;
 
   return b.ToString();
  }
@@ -179,6 +211,8 @@ class Program
   int min_sentence_length = 0; // фильтр по минимальной длине предложений
   int max_sentence_length = int.MaxValue; // фильтр по максимальной длине предложений
   bool reject_unknown = false; // отбрасывать предложения с несловарными токенами
+  bool emit_eol = false; // добавлять в выходной файл токены <EOL> для маркировки конца предложения
+  int eol_count = 0; // кол-во вставляемых <EOL>, гарантированно перекрывающее размер окна в word2vec
 
   List<System.Text.RegularExpressions.Regex> rx_stop = new List<System.Text.RegularExpressions.Regex>();
 
@@ -203,6 +237,13 @@ class Program
    {
     // Добавлять в конец существующего файла
     append_result = true;
+   }
+   else if( args[i] == "-emit_eol" )
+   {
+    ++i;
+    eol_count = int.Parse( args[i] );
+    if( eol_count > 0 )
+     emit_eol = true;
    }
    else if( args[i] == "-result" )
    {
@@ -298,6 +339,8 @@ class Program
   else
    sources = new Samples2( samples_path );
 
+  sources.SetMinSentenceLen( min_sentence_length );
+  sources.SetMaxSentenceLen( max_sentence_length );
 
   if( output_suffix || output_words )
    sources.SetTokenDelimiter( '|' );
@@ -386,9 +429,6 @@ class Program
    {
     using( SolarixGrammarEngineNET.AnalysisResults tokens = gren.AnalyzeMorphology( sample, LanguageID, Flags, Constraints ) )
     {
-     if( min_sentence_length > 0 || max_sentence_length < int.MaxValue && tokens.Count < min_sentence_length || tokens.Count > max_sentence_length )
-      continue;
-
      for( int i = 1; i < tokens.Count - 1; ++i )
      {
       if( char.IsPunctuation( tokens[i].GetWord()[0] ) )
@@ -408,9 +448,6 @@ class Program
    {
     string[] tokens = sample.Split( "|".ToCharArray(), StringSplitOptions.RemoveEmptyEntries );
 
-    if( min_sentence_length > 0 || max_sentence_length < int.MaxValue && tokens.Length < min_sentence_length || tokens.Length > max_sentence_length )
-     continue;
-
     foreach( string token in tokens )
     {
      if( token.Length >= 1 && char.IsPunctuation( token[0] ) )
@@ -423,9 +460,6 @@ class Program
    else if( output_suffix )
    {
     string[] tokens = sample.Split( "|".ToCharArray(), StringSplitOptions.RemoveEmptyEntries );
-
-    if( min_sentence_length > 0 || max_sentence_length < int.MaxValue && tokens.Length < min_sentence_length || tokens.Length > max_sentence_length )
-     continue;
 
     foreach( string token in tokens )
     {
@@ -444,6 +478,10 @@ class Program
      wrt.Write( " {0}", suffix.ToLower() );
     }
    }
+
+   if( emit_eol )
+    for( int k = 0; k < eol_count; ++k )
+     wrt.Write( " <EOL>" );
 
    Console.WriteLine( "[{1}/{2}] {0}", sample, counter, n_total_lines );
 
